@@ -23,8 +23,8 @@ import (
 // is provided, at which point it drains memory buffer and uses real handler from that point.
 // Zero value is useful.
 type BufferLogHandler struct {
-	// level is minimal level that this handler will consider storing
-	level slog.Level
+	// leveler is minimal level that this handler will consider storing
+	leveler slog.Leveler
 	// real is handler to which all calls will be sent to and where memory buffer of records.
 	// will be drained, when provided
 	real slog.Handler
@@ -44,19 +44,19 @@ type BufferLogHandler struct {
 // NewBufferLogHandler returns unbound instance of log handler that stores log records
 // until such time when SetRealHandler is called, at which point messages get flushed
 // and all subsequent calls are just proxy calls to real handler.
-func NewBufferLogHandler(level slog.Level) *BufferLogHandler {
-	return NewBoundBufferLogHandler(level, 0)
+func NewBufferLogHandler(leveler slog.Leveler) *BufferLogHandler {
+	return NewBoundBufferLogHandler(leveler, 0)
 }
 
 // NewBoundBufferLogHandler creates instance of log handler that stores log records with
 // upper limit on number of records, thus providing some level of memory consumption control.
-func NewBoundBufferLogHandler(level slog.Level, maxRecords int) *BufferLogHandler {
+func NewBoundBufferLogHandler(leveler slog.Leveler, maxRecords int) *BufferLogHandler {
 	return &BufferLogHandler{
-		level:  level,
-		real:   nil,
-		buffer: newBuffer[record](maxRecords),
-		attrs:  nil,
-		groups: nil,
+		leveler: leveler,
+		real:    nil,
+		buffer:  newBuffer[record](maxRecords),
+		attrs:   nil,
+		groups:  nil,
 	}
 }
 
@@ -68,7 +68,7 @@ var _ slog.Handler = &BufferLogHandler{}
 func (h *BufferLogHandler) Enabled(ctx context.Context, level slog.Level) bool {
 	rHandler := h.getRealHandler()
 	if rHandler == nil {
-		return level >= h.level
+		return level >= h.leveler.Level()
 	}
 	return rHandler.Enabled(ctx, level)
 }
@@ -170,12 +170,12 @@ func (h *BufferLogHandler) clone() *BufferLogHandler {
 	// maxRecords is not copied since it is irrelevant, it is only used
 	// to create buffer, and buffer is shared, so we don't need it anymore.
 	return &BufferLogHandler{
-		level:  h.level,
-		real:   h.real,
-		buffer: h.buffer,
-		attrs:  slices.Clone(h.attrs),
-		groups: slices.Clone(h.groups),
-		parent: h,
+		leveler: h.leveler,
+		real:    h.real,
+		buffer:  h.buffer,
+		attrs:   slices.Clone(h.attrs),
+		groups:  slices.Clone(h.groups),
+		parent:  h,
 	}
 }
 
